@@ -13,8 +13,8 @@ Mở **Visual Studio Installer → Modify** nếu thiếu workload. Có thể ki
 ## 2. Tải và mở dự án
 
 ```powershell
-git clone https://github.com/nghiahnc/SwaggerGumdam.git
-cd SwaggerGumdam
+git clone https://github.com/nghiahnc/GundamShop-PRN232-API.git
+cd GundamShop-PRN232-API
 ```
 
 Nếu dùng **Download ZIP**, giải nén rồi mở thư mục đó. Trong Visual Studio chọn **File → Open → Project/Solution**, chọn `GundamShop.slnx`. Đặt `GundamShop.Api` làm **Startup Project** bằng cách nhấp phải dự án trong Solution Explorer → **Set as Startup Project**. Nếu Visual Studio không mở được `.slnx`, cập nhật Visual Studio hoặc mở thư mục dự án bằng **File → Open → Folder**, rồi dùng lệnh Terminal ở mục 5.
