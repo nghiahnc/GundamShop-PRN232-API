@@ -105,6 +105,19 @@ Check ((Api GET "/api/v1/vouchers/$($fixed.id)" $null $admin).usedCount -eq 1) '
 $null = Api POST "/api/v1/orders/$($order.id)/cancel" $null $buyer.token
 Check ((Api GET "/api/v1/vouchers/$($fixed.id)" $null $admin).usedCount -eq 0) 'Cancelling the order must give the use back'
 
+# Mỗi khách dùng mỗi voucher một lần; đơn đã hủy trả lại lượt nên khách dùng lại được
+$first = (Checkout $buyer $fixed.code 1).Content | ConvertFrom-Json
+$again = Checkout $buyer $fixed.code 1
+Check ((Status $again) -eq 409 -and (Title $again) -eq 'Bạn đã dùng voucher này.') 'Same customer must not use a voucher twice'
+$otherOrder = (Checkout (NewCustomer 'Khach C') $fixed.code 1)
+Check ((Status $otherOrder) -eq 201) 'Another customer may use the same voucher'
+$null = Api POST "/api/v1/orders/$($first.id)/cancel" $null $buyer.token
+$retry = Checkout $buyer $fixed.code 1
+Check ((Status $retry) -eq 201) 'After cancelling, the customer may use the voucher again'
+$null = Api POST "/api/v1/orders/$(($retry.Content | ConvertFrom-Json).id)/cancel" $null $buyer.token
+$null = Api POST "/api/v1/orders/$(($otherOrder.Content | ConvertFrom-Json).id)/cancel" $null $admin
+Check ((Api GET "/api/v1/vouchers/$($fixed.id)" $null $admin).usedCount -eq 0) 'Cancelled orders must give every use back'
+
 $capped = NewVoucher "PCT-$suffix" @{ discountPercent=10; discountVnd=20000 }
 Check ($capped.discountPercent -eq 10) 'Percent voucher must keep discountPercent'
 $order = (Checkout $buyer $capped.code 2).Content | ConvertFrom-Json

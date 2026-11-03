@@ -39,6 +39,7 @@ Mọi danh sách trả `{ items, pageNumber, pageSize, totalCount }`, `pageSize`
   - `discountPercent` để trống hoặc `0`: giảm cố định `discountVnd`.
   - `discountPercent` 1–100: giảm theo % tạm tính, làm tròn xuống, **tối đa** `discountVnd`. Ví dụ `discountPercent = 10`, `discountVnd = 20000`: đơn 300.000 được giảm 20.000 (10% là 30.000 nhưng chạm mức tối đa), đơn 150.000 được giảm 15.000.
   - Không bao giờ giảm quá tạm tính.
+- **Mỗi khách dùng mỗi voucher một lần.** Khách đã có đơn dùng mã này mà đơn chưa hủy thì nhận 409 "Bạn đã dùng voucher này.". Đơn đã hủy, hết hạn hoặc thanh toán thất bại đã trả lại lượt, nên khách dùng lại được.
 - **Giới hạn**: `discountVnd` 1–1.000.000.000, `minSubtotalVnd` 0–1.000.000.000, `maxUses` 1–1.000.000.
 - **Thời gian (UTC)**: `startsAtUtc` phải trước `endsAtUtc`.
   - Ngày giờ không kèm múi giờ (`2026-12-01T00:00:00`) được hiểu là UTC. Kèm múi giờ (`2026-12-01T07:00:00+07:00`) thì đổi sang UTC.
@@ -75,6 +76,7 @@ Khi đặt hàng, `VoucherRules.Apply` báo đúng lý do voucher không dùng �
 | Chưa tới ngày | Voucher chưa đến thời gian sử dụng. |
 | Hết hạn | Voucher đã hết hạn. |
 | Hết lượt | Voucher đã hết lượt sử dụng. |
+| Khách đã dùng mã này (đơn chưa hủy) | Bạn đã dùng voucher này. |
 | Chưa đủ giá trị đơn | Đơn hàng cần tối thiểu 500.000 VND để dùng voucher này. |
 
 Mã không tồn tại trả 404 "Không tìm thấy voucher.".
@@ -90,7 +92,7 @@ Mã không tồn tại trả 404 "Không tìm thấy voucher.".
 
 ## 6. Điểm kỹ thuật nên giải thích khi vấn đáp
 
-**Một chỗ cho quy tắc voucher.** `VoucherRules.Apply` gom mọi điều kiện (đang bật, trong thời hạn, còn lượt, đủ giá trị đơn) và cách tính tiền giảm (cố định hoặc %, có mức tối đa). `Checkout` chỉ gọi một dòng, nên đổi quy tắc voucher không phải sửa code đặt hàng. Tiền giảm tính bằng `decimal` để không tràn số với đơn lớn.
+**Một chỗ cho quy tắc voucher.** `VoucherRules.Apply` gom mọi điều kiện (đang bật, trong thời hạn, còn lượt, khách chưa dùng, đủ giá trị đơn) và cách tính tiền giảm (cố định hoặc %, có mức tối đa). `VoucherRules.UsedBy` kiểm tra khách đã có đơn dùng mã này chưa, bỏ qua đơn đã trả lại lượt. `Checkout` chỉ gọi một dòng, nên đổi quy tắc voucher không phải sửa code đặt hàng. Tiền giảm tính bằng `decimal` để không tràn số với đơn lớn.
 
 **Giờ UTC.** SQL Server `datetime2` không lưu múi giờ. Vì vậy API chuẩn hóa mọi ngày giờ gửi lên về UTC trước khi kiểm tra và lưu. Khi đọc, value converter đánh dấu giá trị là UTC để JSON có `Z`. Trước đây, chạy API trên máy Windows đặt giờ Việt Nam thì `2030-01-01T00:00:00` bị lưu thành `2029-12-31T17:00:00`, voucher mở sớm 7 tiếng.
 
@@ -113,7 +115,7 @@ Khi API chạy ở `http://127.0.0.1:5288` trong Development (script dùng endpo
 ./tests/smoke.ps1
 ```
 
-Kết quả đúng là dòng `PASS: ...` ở cuối mỗi script. `vouchers-reviews.ps1` thử tạo/sửa/ngừng/bật lại voucher, giảm cố định và theo %, PUT giữ nguyên cách giảm, từng lý do voucher bị từ chối khi đặt hàng, lượt dùng được trả lại khi hủy đơn, lọc `status`, tạo trùng mã song song. Phần đánh giá thử quyền, chưa nhận hàng, trùng đánh giá song song, tổng hợp số sao, sản phẩm đã ẩn.
+Kết quả đúng là dòng `PASS: ...` ở cuối mỗi script. `vouchers-reviews.ps1` thử tạo/sửa/ngừng/bật lại voucher, giảm cố định và theo %, PUT giữ nguyên cách giảm, từng lý do voucher bị từ chối khi đặt hàng, mỗi khách một lần, lượt dùng được trả lại khi hủy đơn, lọc `status`, tạo trùng mã song song. Phần đánh giá thử quyền, chưa nhận hàng, trùng đánh giá song song, tổng hợp số sao, sản phẩm đã ẩn.
 
 ## 9. Sau khi pull code này
 
@@ -127,6 +129,6 @@ Hoặc trong Package Manager Console của Visual Studio: `Update-Database -Proj
 
 ## 10. Chỗ đụng tới code dùng chung
 
-- `ShoppingService.Checkout` (dattg): thay 3 dòng kiểm tra voucher bằng `VoucherRules.Apply(...)`. Tổng tiền đơn với voucher cố định không đổi.
+- `ShoppingService.Checkout` (dattg): thay 3 dòng kiểm tra voucher bằng `VoucherRules.Apply(...)`, có thêm điều kiện mỗi khách dùng mỗi voucher một lần. Tổng tiền đơn với voucher cố định không đổi.
 - `ApiExceptionMiddleware`: JSON sai cú pháp hoặc giá trị không đọc được (ví dụ ngày giờ `"abc"`) trả 400 thay vì 500. Lỗi trả `Content-Type: application/problem+json; charset=utf-8`.
 - `PageHelper`: `page` quá lớn trả 400 thay vì 500.

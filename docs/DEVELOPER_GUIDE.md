@@ -119,6 +119,6 @@ Khi API chạy ở `http://127.0.0.1:5288`, gọi:
 
 Script tạo dữ liệu test có hậu tố ngẫu nhiên và thử 5 bộ CRUD, đơn có voucher, thanh toán mock thành công/thất bại, hoàn tồn kho, đánh giá sau giao hàng và OData. Stripe thật cần test key, webhook secret và tài khoản hợp lệ; bản demo không gọi Stripe mặc định. Các mục chưa có trong v1: giao diện React/Flutter, hoàn tiền tự động, phí vận chuyển, thuế, cổng vận chuyển.
 
-`./tests/vouchers-reviews.ps1` kiểm thử riêng voucher (giảm cố định và theo %, lý do bị từ chối khi đặt hàng, trả lượt khi hủy đơn, lọc trạng thái) và đánh giá (quyền, chưa nhận hàng, trùng đánh giá, tổng hợp số sao). Các script trong `tests/` cần PowerShell 7 (`pwsh`), không chạy bằng Windows PowerShell 5.1.
+`./tests/vouchers-reviews.ps1` kiểm thử riêng voucher (giảm cố định và theo %, lý do bị từ chối khi đặt hàng, mỗi khách một lần, trả lượt khi hủy đơn, lọc trạng thái) và đánh giá (quyền, chưa nhận hàng, trùng đánh giá, tổng hợp số sao). Các script trong `tests/` cần PowerShell 7 (`pwsh`), không chạy bằng Windows PowerShell 5.1.
 
 Để thử webhook Stripe **mà không gọi mạng Stripe**, chạy API ở Development với `Payments__Provider=Stripe`, `Payments__Stripe__SecretKey=sk_test_unused`, `Payments__Stripe__WebhookSecret=whsec_local_test` trên cổng `5289`, rồi chạy `./tests/stripe-webhook.ps1`. Script dùng `sqlcmd` để gắn session ID giả vào đơn thử trong LocalDB, gửi webhook có chữ ký HMAC, gửi lại cùng event để kiểm tra xử lý một lần, và thử chữ ký sai. Đây là kiểm thử logic webhook; không xác nhận API Checkout Session thật của Stripe.

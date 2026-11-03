@@ -14,15 +14,23 @@ public static class VoucherRules
     public static readonly string[] Statuses = ["Active", "Scheduled", "Expired", "UsedUp", "Disabled"];
 
     // Kiểm tra voucher lúc đặt hàng (Checkout gọi hàm này) và trả số tiền được giảm.
-    public static long Apply(Voucher v, long subtotal, DateTime nowUtc)
+    // usedByCustomer: kết quả của UsedBy, mỗi khách chỉ dùng mỗi voucher một lần.
+    public static long Apply(Voucher v, long subtotal, DateTime nowUtc, bool usedByCustomer)
     {
         ShopGuard.Require(v.IsActive, "Voucher đã ngừng sử dụng.", 409);
         ShopGuard.Require(v.StartsAtUtc <= nowUtc, "Voucher chưa đến thời gian sử dụng.", 409);
         ShopGuard.Require(v.EndsAtUtc > nowUtc, "Voucher đã hết hạn.", 409);
         ShopGuard.Require(v.UsedCount < v.MaxUses, "Voucher đã hết lượt sử dụng.", 409);
+        ShopGuard.Require(!usedByCustomer, "Bạn đã dùng voucher này.", 409);
         ShopGuard.Require(subtotal >= v.MinSubtotalVnd, $"Đơn hàng cần tối thiểu {Vnd(v.MinSubtotalVnd)} để dùng voucher này.", 409);
         return Discount(v, subtotal);
     }
+
+    // Khách đã có đơn dùng voucher này và lượt chưa được trả lại.
+    // Đơn hủy, hết hạn hoặc thanh toán thất bại đã trả lượt (UsedCount--), nên không tính.
+    public static Task<bool> UsedBy(ShopDbContext db, Guid userId, Guid voucherId) =>
+        db.Orders.AnyAsync(o => o.UserId == userId && o.VoucherId == voucherId
+            && o.Status != "Cancelled" && o.Status != "Expired" && o.Status != "PaymentFailed");
 
     // Voucher cố định giảm DiscountVnd. Voucher % giảm DiscountPercent% tạm tính (làm tròn xuống), tối đa DiscountVnd.
     // Không bao giờ giảm quá tạm tính.

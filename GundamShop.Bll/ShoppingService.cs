@@ -70,8 +70,8 @@ public class ShoppingService(ShopDbContext db)
         {
             var code = i.VoucherCode.Trim().ToUpperInvariant();
             voucher = ShopGuard.Found(await db.Vouchers.SingleOrDefaultAsync(v => v.Code == code), "voucher");
-            // Quy tắc voucher (thời hạn, lượt dùng, đơn tối thiểu, giảm cố định hoặc theo %) nằm ở VoucherRules.
-            discount = VoucherRules.Apply(voucher, subtotal, DateTime.UtcNow);
+            // Quy tắc voucher (thời hạn, lượt dùng, mỗi khách một lần, đơn tối thiểu, giảm cố định hoặc theo %) nằm ở VoucherRules.
+            discount = VoucherRules.Apply(voucher, subtotal, DateTime.UtcNow, await VoucherRules.UsedBy(db, userId, voucher.Id));
             voucher.UsedCount++;
         }
         var order = new ShopOrder
