@@ -384,7 +384,10 @@ namespace GundamShop.Dal.Migrations
                     b.HasIndex("UserId", "ProductId")
                         .IsUnique();
 
-                    b.ToTable("Reviews");
+                    b.ToTable("Reviews", t =>
+                        {
+                            t.HasCheckConstraint("CK_Reviews_Rating", "[Rating] BETWEEN 1 AND 5");
+                        });
                 });
 
             modelBuilder.Entity("GundamShop.Dal.ShopOrder", b =>
@@ -459,6 +462,9 @@ namespace GundamShop.Dal.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<int?>("DiscountPercent")
+                        .HasColumnType("int");
+
                     b.Property<long>("DiscountVnd")
                         .HasColumnType("bigint");
 
@@ -485,7 +491,18 @@ namespace GundamShop.Dal.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Vouchers");
+                    b.ToTable("Vouchers", t =>
+                        {
+                            t.HasCheckConstraint("CK_Vouchers_DiscountPercent", "[DiscountPercent] IS NULL OR [DiscountPercent] BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("CK_Vouchers_DiscountVnd", "[DiscountVnd] > 0");
+
+                            t.HasCheckConstraint("CK_Vouchers_MinSubtotalVnd", "[MinSubtotalVnd] >= 0");
+
+                            t.HasCheckConstraint("CK_Vouchers_Period", "[StartsAtUtc] < [EndsAtUtc]");
+
+                            t.HasCheckConstraint("CK_Vouchers_UsedCount", "[UsedCount] >= 0 AND [UsedCount] <= [MaxUses]");
+                        });
                 });
 
             modelBuilder.Entity("GundamShop.Dal.Address", b =>

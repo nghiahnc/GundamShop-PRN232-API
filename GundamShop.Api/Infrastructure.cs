@@ -7,6 +7,9 @@ using GundamShop.Dal;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace GundamShop.Api;
 
@@ -20,6 +23,7 @@ public class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExceptionMi
             var status = ex switch
             {
                 ShopException e => e.Status,
+                BadHttpRequestException e => e.StatusCode,
                 DbUpdateConcurrencyException => 409,
                 DbUpdateException => 409,
                 OverflowException => 400,
@@ -27,8 +31,14 @@ public class ApiExceptionMiddleware(RequestDelegate next, ILogger<ApiExceptionMi
             };
             if (status == 500) logger.LogError(ex, "Unhandled API error");
             context.Response.StatusCode = status;
-            context.Response.ContentType = "application/problem+json";
-            await context.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = status == 500 ? "Lỗi máy chủ" : ex.Message });
+            var title = ex switch
+            {
+                _ when status == 500 => "Lỗi máy chủ",
+                // JSON sai cú pháp, ngày giờ hoặc số không đọc được (ví dụ "startsAtUtc": "abc").
+                BadHttpRequestException => "Dữ liệu gửi lên không đúng định dạng.",
+                _ => ex.Message
+            };
+            await context.Response.WriteAsJsonAsync(new ProblemDetails { Status = status, Title = title }, options: null, contentType: "application/problem+json; charset=utf-8");
         }
     }
 }
@@ -47,6 +57,27 @@ public class ValidationFilter : IEndpointFilter
                     errors[key] = [result.ErrorMessage ?? "Không hợp lệ."];
         }
         return errors.Count > 0 ? Results.ValidationProblem(errors) : await next(context);
+    }
+}
+
+// Body mẫu hợp lệ cho POST/PUT voucher trong Swagger (mặc định Swagger cho ngày bắt đầu = ngày kết thúc nên bị báo 400).
+public class VoucherRequestExampleFilter : ISchemaFilter
+{
+    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    {
+        if (context.Type != typeof(VoucherRequest)) return;
+        var today = DateTime.UtcNow.Date;
+        schema.Example = new OpenApiObject
+        {
+            ["code"] = new OpenApiString("SALE10"),
+            ["discountVnd"] = new OpenApiLong(50000),
+            ["minSubtotalVnd"] = new OpenApiLong(300000),
+            ["maxUses"] = new OpenApiInteger(100),
+            ["startsAtUtc"] = new OpenApiString(today.ToString("yyyy-MM-ddTHH:mm:ssZ")),
+            ["endsAtUtc"] = new OpenApiString(today.AddDays(30).ToString("yyyy-MM-ddTHH:mm:ssZ")),
+            ["discountPercent"] = new OpenApiNull(),
+            ["isActive"] = new OpenApiBoolean(true)
+        };
     }
 }
 

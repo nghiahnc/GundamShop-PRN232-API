@@ -75,6 +75,8 @@ public class Voucher
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Code { get; set; } = "";
     public long DiscountVnd { get; set; }
+    // null: giảm cố định DiscountVnd. 1..100: giảm theo %, tối đa DiscountVnd.
+    public int? DiscountPercent { get; set; }
     public long MinSubtotalVnd { get; set; }
     public int MaxUses { get; set; }
     public int UsedCount { get; set; }

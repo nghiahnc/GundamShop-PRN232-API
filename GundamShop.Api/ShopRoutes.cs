@@ -33,7 +33,8 @@ public static class ShopRoutes
         products.MapPut("/{id:guid}", async (Guid id, ProductRequest i, CatalogService s) => Results.Ok(await s.UpdateProduct(id, i))).RequireAuthorization("Admin");
         products.MapDelete("/{id:guid}", async (Guid id, CatalogService s) => { await s.DeleteProduct(id); return Results.NoContent(); }).RequireAuthorization("Admin");
         products.MapGet("/{id:guid}/variants", async (Guid id, int? page, int? pageSize, HttpContext h, CatalogService s) => Results.Ok(await s.Variants(id, page ?? 1, pageSize ?? 20, h.User.IsInRole("Admin"))));
-        products.MapGet("/{id:guid}/reviews", async (Guid id, int? page, int? pageSize, PromotionService s) => Results.Ok(await s.Reviews(id, page ?? 1, pageSize ?? 20)));
+        products.MapGet("/{id:guid}/reviews", async (HttpContext h, Guid id, int? rating, int? page, int? pageSize, PromotionService s) =>
+            Results.Ok(await s.Reviews(id, rating, page ?? 1, pageSize ?? 20, h.User.IsInRole("Admin"))));
 
         var variants = api.MapGroup("/variants").WithTags("3 - SKU và tồn kho");
         variants.MapGet("/{id:guid}", async (HttpContext h, Guid id, CatalogService s) => Results.Ok(await s.Variant(id, h.User.IsInRole("Admin"))));
@@ -57,15 +58,15 @@ public static class ShopRoutes
         orders.MapPut("/{id:guid}/status", async (Guid id, StatusRequest i, ShoppingService s) => Results.Ok(await s.SetStatus(id, i.Status))).RequireAuthorization("Admin");
 
         var vouchers = api.MapGroup("/vouchers").WithTags("5 - Voucher").RequireAuthorization("Admin");
-        vouchers.MapGet("/", async (int? page, int? pageSize, PromotionService s) => Results.Ok(await s.Vouchers(page ?? 1, pageSize ?? 20)));
+        vouchers.MapGet("/", async (string? search, string? status, int? page, int? pageSize, PromotionService s) => Results.Ok(await s.Vouchers(search, status, page ?? 1, pageSize ?? 20)));
         vouchers.MapGet("/{id:guid}", async (Guid id, PromotionService s) => Results.Ok(await s.Voucher(id)));
-        vouchers.MapPost("/", async (VoucherRequest i, PromotionService s) => Results.Created("/api/v1/vouchers", await s.AddVoucher(i)));
+        vouchers.MapPost("/", async (VoucherRequest i, PromotionService s) => { var v = await s.AddVoucher(i); return Results.Created($"/api/v1/vouchers/{v.Id}", v); });
         vouchers.MapPut("/{id:guid}", async (Guid id, VoucherRequest i, PromotionService s) => Results.Ok(await s.UpdateVoucher(id, i)));
         vouchers.MapDelete("/{id:guid}", async (Guid id, PromotionService s) => { await s.DeleteVoucher(id); return Results.NoContent(); });
 
         var reviews = api.MapGroup("/reviews").WithTags("5 - Đánh giá");
-        reviews.MapGet("/{id:guid}", async (Guid id, PromotionService s) => Results.Ok(await s.Review(id)));
-        reviews.MapPost("/", async (HttpContext h, ReviewRequest i, PromotionService s) => Results.Created("/api/v1/reviews", await s.AddReview(h.UserId(), i))).RequireAuthorization();
+        reviews.MapGet("/{id:guid}", async (HttpContext h, Guid id, PromotionService s) => Results.Ok(await s.Review(id, h.User.IsInRole("Admin"))));
+        reviews.MapPost("/", async (HttpContext h, ReviewRequest i, PromotionService s) => { var r = await s.AddReview(h.UserId(), i); return Results.Created($"/api/v1/reviews/{r.Id}", r); }).RequireAuthorization();
         reviews.MapPut("/{id:guid}", async (HttpContext h, Guid id, ReviewUpdateRequest i, PromotionService s) => Results.Ok(await s.UpdateReview(h.UserId(), id, i))).RequireAuthorization();
         reviews.MapDelete("/{id:guid}", async (HttpContext h, Guid id, PromotionService s) => { await s.DeleteReview(h.UserId(), id, h.User.IsInRole("Admin")); return Results.NoContent(); }).RequireAuthorization();
 

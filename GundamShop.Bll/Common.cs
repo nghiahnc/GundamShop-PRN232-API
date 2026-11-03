@@ -16,6 +16,7 @@ public static class PageHelper
     public static async Task<Page<T>> GetAsync<T>(IQueryable<T> query, int page, int size, CancellationToken ct = default)
     {
         if (page < 1 || size < 1 || size > 100) throw new ShopException(400, "page phải >= 1 và pageSize phải trong khoảng 1..100.");
+        if ((long)(page - 1) * size > int.MaxValue) throw new ShopException(400, "page quá lớn.");
         var total = await query.CountAsync(ct);
         var items = await query.Skip((page - 1) * size).Take(size).ToListAsync(ct);
         return new(items, page, size, total);
@@ -65,8 +66,27 @@ public record OrderItemDto(Guid VariantId, string ProductName, string Sku, long 
 public record OrderDto(Guid Id, string Status, string PaymentStatus, long SubtotalVnd, long DiscountVnd, long TotalVnd, DateTime CreatedAtUtc, DateTime ExpiresAtUtc, IReadOnlyList<OrderItemDto> Items);
 public record StatusRequest([property: Required] string Status);
 
-public record VoucherRequest([property: Required, MaxLength(64)] string Code, [property: Range(1, long.MaxValue)] long DiscountVnd, [property: Range(0, long.MaxValue)] long MinSubtotalVnd, [property: Range(1, int.MaxValue)] int MaxUses, DateTime StartsAtUtc, DateTime EndsAtUtc);
-public record VoucherDto(Guid Id, string Code, long DiscountVnd, long MinSubtotalVnd, int MaxUses, int UsedCount, DateTime StartsAtUtc, DateTime EndsAtUtc, bool IsActive);
-public record ReviewRequest(Guid ProductId, [property: Range(1, 5)] int Rating, [property: Required, MaxLength(1000)] string Comment);
-public record ReviewUpdateRequest([property: Range(1, 5)] int Rating, [property: Required, MaxLength(1000)] string Comment);
-public record ReviewDto(Guid Id, Guid ProductId, Guid UserId, int Rating, string Comment, DateTime CreatedAtUtc);
+// DiscountPercent để trống: giảm cố định DiscountVnd. Có DiscountPercent: giảm theo %, DiscountVnd là mức giảm tối đa.
+// IsActive để trống: tạo mới thì bật, sửa thì giữ nguyên trạng thái.
+public record VoucherRequest(
+    [property: Required(ErrorMessage = "Mã voucher là bắt buộc."), MaxLength(64, ErrorMessage = "Mã voucher tối đa 64 ký tự."),
+        RegularExpression(VoucherRules.CodePattern, ErrorMessage = "Mã voucher chỉ gồm chữ, số, '-' và '_'.")] string Code,
+    [property: Range(1, VoucherRules.MaxAmountVnd, ErrorMessage = "Số tiền giảm phải từ 1 đến 1.000.000.000 VND.")] long DiscountVnd,
+    [property: Range(0, VoucherRules.MaxAmountVnd, ErrorMessage = "Giá trị đơn tối thiểu phải từ 0 đến 1.000.000.000 VND.")] long MinSubtotalVnd,
+    [property: Range(1, VoucherRules.MaxUses, ErrorMessage = "Số lượt dùng phải từ 1 đến 1.000.000.")] int MaxUses,
+    [property: Required(ErrorMessage = "Thời điểm bắt đầu là bắt buộc.")] DateTime? StartsAtUtc,
+    [property: Required(ErrorMessage = "Thời điểm kết thúc là bắt buộc.")] DateTime? EndsAtUtc,
+    [property: Range(1, 100, ErrorMessage = "Phần trăm giảm phải từ 1 đến 100.")] int? DiscountPercent = null,
+    bool? IsActive = null);
+// Status: Active (dùng được), Scheduled (chưa tới ngày), Expired (hết hạn), UsedUp (hết lượt), Disabled (đã ngừng).
+public record VoucherDto(Guid Id, string Code, long DiscountVnd, long MinSubtotalVnd, int MaxUses, int UsedCount, DateTime StartsAtUtc, DateTime EndsAtUtc, bool IsActive,
+    int? DiscountPercent, string Status);
+public record ReviewRequest(Guid ProductId,
+    [property: Range(1, 5, ErrorMessage = "Số sao phải từ 1 đến 5.")] int Rating,
+    [property: Required(ErrorMessage = "Nội dung đánh giá là bắt buộc."), MaxLength(1000, ErrorMessage = "Nội dung đánh giá tối đa 1000 ký tự.")] string Comment);
+public record ReviewUpdateRequest(
+    [property: Range(1, 5, ErrorMessage = "Số sao phải từ 1 đến 5.")] int Rating,
+    [property: Required(ErrorMessage = "Nội dung đánh giá là bắt buộc."), MaxLength(1000, ErrorMessage = "Nội dung đánh giá tối đa 1000 ký tự.")] string Comment);
+public record ReviewDto(Guid Id, Guid ProductId, Guid UserId, int Rating, string Comment, DateTime CreatedAtUtc, string ReviewerName);
+// Danh sách đánh giá kèm tổng hợp số sao của cả sản phẩm (không phụ thuộc bộ lọc rating).
+public record ReviewPage(IReadOnlyList<ReviewDto> Items, int PageNumber, int PageSize, int TotalCount, double? AverageRating, IReadOnlyDictionary<int, int> RatingCounts);
