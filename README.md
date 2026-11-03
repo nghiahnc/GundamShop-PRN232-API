@@ -20,4 +20,4 @@ Repository độc lập cho môn PRN232: backend cửa hàng mô hình Gundam vi
 
 Nếu mới clone dự án và muốn cài database **trong Visual Studio**, làm theo [hướng dẫn Visual Studio + SQL Server Object Explorer](VISUAL_STUDIO_DATABASE_SETUP.md).
 
-File [phân công nhóm](outputs/01a0eab7-3c3c-79c1-9b9d-7651a6ec1cf4/GundamShop_PhanCong.xlsx) có sheet **Tổng kết** và **Chức năng thành viên**. Chạy `tests/smoke.ps1` khi API đang mở ở `http://127.0.0.1:5288` để kiểm thử luồng chính.
+File [phân công nhóm](outputs/01a0eab7-3c3c-79c1-9b9d-7651a6ec1cf4/GundamShop_PhanCong.xlsx) có sheet **Tổng kết** và **Chức năng thành viên**. Chạy `tests/smoke.ps1` khi API đang mở ở `http://127.0.0.1:5288` để kiểm thử luồng chính. Phần voucher và đánh giá có script riêng `tests/vouchers-reviews.ps1` và tài liệu [Voucher và Đánh giá](docs/VOUCHER_DANH_GIA.md).

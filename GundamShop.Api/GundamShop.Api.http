@@ -19,3 +19,41 @@ POST {{host}}/api/v1/auth/login
 Content-Type: application/json
 
 {"email":"admin@gundam.local","password":"Admin123!"}
+
+### Voucher và Đánh giá (nghiath). Dán accessToken của admin và của khách đã nhận hàng.
+@adminToken = <accessToken-admin>
+@customerToken = <accessToken-khach>
+@voucherId = <voucher-id>
+@productId = <product-id>
+
+GET {{host}}/api/v1/vouchers?status=Active&search=SALE
+Authorization: Bearer {{adminToken}}
+
+###
+
+POST {{host}}/api/v1/vouchers
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"code":"SALE10","discountVnd":50000,"discountPercent":10,"minSubtotalVnd":300000,"maxUses":100,"startsAtUtc":"2026-11-01T00:00:00Z","endsAtUtc":"2026-12-31T23:59:59Z"}
+
+###
+
+PUT {{host}}/api/v1/vouchers/{{voucherId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"code":"SALE10","discountVnd":50000,"discountPercent":10,"minSubtotalVnd":300000,"maxUses":200,"startsAtUtc":"2026-11-01T00:00:00Z","endsAtUtc":"2027-01-31T23:59:59Z","isActive":true}
+
+###
+
+GET {{host}}/api/v1/products/{{productId}}/reviews?rating=5
+Accept: application/json
+
+###
+
+POST {{host}}/api/v1/reviews
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{"productId":"{{productId}}","rating":5,"comment":"Mô hình đẹp, khớp chắc"}
