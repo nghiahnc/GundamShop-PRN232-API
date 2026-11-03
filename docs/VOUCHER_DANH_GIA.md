@@ -36,8 +36,8 @@ Mọi danh sách trả `{ items, pageNumber, pageSize, totalCount }`, `pageSize`
 
 - **Mã**: chỉ gồm chữ, số, `-`, `_`, tối đa 64 ký tự. API cắt khoảng trắng đầu/cuối rồi đổi sang chữ hoa, nên ` sale10 ` và `SALE10` là một mã. Không có hai voucher trùng mã, kể cả hai request tạo cùng lúc.
 - **Mức giảm**:
-  - Không gửi `discountPercent`: giảm cố định `discountVnd`.
-  - Gửi `discountPercent` (1–100): giảm theo % tạm tính, làm tròn xuống, **tối đa** `discountVnd`. Ví dụ `discountPercent = 10`, `discountVnd = 20000`: đơn 300.000 được giảm 20.000 (10% là 30.000 nhưng chạm mức tối đa), đơn 150.000 được giảm 15.000.
+  - `discountPercent` để trống hoặc `0`: giảm cố định `discountVnd`.
+  - `discountPercent` 1–100: giảm theo % tạm tính, làm tròn xuống, **tối đa** `discountVnd`. Ví dụ `discountPercent = 10`, `discountVnd = 20000`: đơn 300.000 được giảm 20.000 (10% là 30.000 nhưng chạm mức tối đa), đơn 150.000 được giảm 15.000.
   - Không bao giờ giảm quá tạm tính.
 - **Giới hạn**: `discountVnd` 1–1.000.000.000, `minSubtotalVnd` 0–1.000.000.000, `maxUses` 1–1.000.000.
 - **Thời gian (UTC)**: `startsAtUtc` phải trước `endsAtUtc`.
@@ -50,7 +50,11 @@ Mọi danh sách trả `{ items, pageNumber, pageSize, totalCount }`, `pageSize`
   3. `Scheduled`: chưa tới ngày bắt đầu.
   4. `UsedUp`: hết lượt.
   5. `Active`: dùng được.
-- **Ngừng và bật lại**: DELETE chỉ ngừng voucher. PUT có `isActive: true` bật lại, `false` ngừng, không gửi `isActive` thì giữ nguyên trạng thái.
+- **Ngừng và bật lại**: DELETE chỉ ngừng voucher. PUT có `isActive: true` bật lại, `false` ngừng.
+- **Sửa (PUT)**: hai trường không gửi thì giữ nguyên.
+  - Không gửi `isActive`: giữ trạng thái bật/ngừng.
+  - Không gửi `discountPercent`: giữ cách giảm. Gửi `0` để chuyển voucher % sang giảm cố định.
+  - Nhờ vậy, client chỉ gia hạn ngày hết hạn (UC42) không vô tình biến voucher "10% tối đa 50.000" thành "giảm thẳng 50.000".
 - **Số lượt**: không hạ `maxUses` xuống dưới số lượt đã dùng (409).
 - **Database** có CHECK: `DiscountVnd > 0`, `DiscountPercent` rỗng hoặc 1–100, `MinSubtotalVnd >= 0`, `0 <= UsedCount <= MaxUses`, `StartsAtUtc < EndsAtUtc`.
 
@@ -82,7 +86,7 @@ Mã không tồn tại trả 404 "Không tìm thấy voucher.".
 - `rating` 1–5 (database cũng có CHECK). `comment` bắt buộc, tối đa 1000 ký tự, được cắt khoảng trắng đầu/cuối.
 - Chỉ chủ đánh giá được sửa (admin cũng không sửa hộ). Chủ hoặc admin được xóa, xóa hẳn khỏi database.
 - `reviewerName` lấy từ họ tên tài khoản, để app hiển thị người viết.
-- Sản phẩm đã ngừng bán hoặc nằm trong danh mục đã ẩn: khách không xem danh sách hay chi tiết đánh giá (404) và không viết thêm được (400). Admin vẫn xem để kiểm duyệt.
+- Sản phẩm đã ngừng bán hoặc nằm trong danh mục đã ẩn: khách không xem danh sách hay chi tiết đánh giá (404), không viết thêm (400) và không sửa đánh giá cũ (409), nhưng vẫn xóa được đánh giá của mình. Admin vẫn xem để kiểm duyệt.
 
 ## 6. Điểm kỹ thuật nên giải thích khi vấn đáp
 
@@ -109,7 +113,7 @@ Khi API chạy ở `http://127.0.0.1:5288` trong Development (script dùng endpo
 ./tests/smoke.ps1
 ```
 
-Kết quả đúng là dòng `PASS: ...` ở cuối mỗi script. `vouchers-reviews.ps1` thử tạo/sửa/ngừng/bật lại voucher, giảm cố định và theo %, từng lý do voucher bị từ chối khi đặt hàng, lượt dùng được trả lại khi hủy đơn, lọc `status`, tạo trùng mã song song. Phần đánh giá thử quyền, chưa nhận hàng, trùng đánh giá song song, tổng hợp số sao, sản phẩm đã ẩn.
+Kết quả đúng là dòng `PASS: ...` ở cuối mỗi script. `vouchers-reviews.ps1` thử tạo/sửa/ngừng/bật lại voucher, giảm cố định và theo %, PUT giữ nguyên cách giảm, từng lý do voucher bị từ chối khi đặt hàng, lượt dùng được trả lại khi hủy đơn, lọc `status`, tạo trùng mã song song. Phần đánh giá thử quyền, chưa nhận hàng, trùng đánh giá song song, tổng hợp số sao, sản phẩm đã ẩn.
 
 ## 9. Sau khi pull code này
 

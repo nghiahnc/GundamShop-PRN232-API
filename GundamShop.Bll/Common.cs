@@ -66,8 +66,9 @@ public record OrderItemDto(Guid VariantId, string ProductName, string Sku, long 
 public record OrderDto(Guid Id, string Status, string PaymentStatus, long SubtotalVnd, long DiscountVnd, long TotalVnd, DateTime CreatedAtUtc, DateTime ExpiresAtUtc, IReadOnlyList<OrderItemDto> Items);
 public record StatusRequest([property: Required] string Status);
 
-// DiscountPercent để trống: giảm cố định DiscountVnd. Có DiscountPercent: giảm theo %, DiscountVnd là mức giảm tối đa.
-// IsActive để trống: tạo mới thì bật, sửa thì giữ nguyên trạng thái.
+// DiscountPercent 1–100: giảm theo %, DiscountVnd là mức giảm tối đa. 0: giảm cố định DiscountVnd.
+// Để trống DiscountPercent: tạo mới thì giảm cố định, sửa thì giữ nguyên cách giảm.
+// Để trống IsActive: tạo mới thì bật, sửa thì giữ nguyên trạng thái.
 public record VoucherRequest(
     [property: Required(ErrorMessage = "Mã voucher là bắt buộc."), MaxLength(64, ErrorMessage = "Mã voucher tối đa 64 ký tự."),
         RegularExpression(VoucherRules.CodePattern, ErrorMessage = "Mã voucher chỉ gồm chữ, số, '-' và '_'.")] string Code,
@@ -76,7 +77,7 @@ public record VoucherRequest(
     [property: Range(1, VoucherRules.MaxUses, ErrorMessage = "Số lượt dùng phải từ 1 đến 1.000.000.")] int MaxUses,
     [property: Required(ErrorMessage = "Thời điểm bắt đầu là bắt buộc.")] DateTime? StartsAtUtc,
     [property: Required(ErrorMessage = "Thời điểm kết thúc là bắt buộc.")] DateTime? EndsAtUtc,
-    [property: Range(1, 100, ErrorMessage = "Phần trăm giảm phải từ 1 đến 100.")] int? DiscountPercent = null,
+    [property: Range(0, 100, ErrorMessage = "Phần trăm giảm phải từ 1 đến 100, hoặc 0 để giảm cố định.")] int? DiscountPercent = null,
     bool? IsActive = null);
 // Status: Active (dùng được), Scheduled (chưa tới ngày), Expired (hết hạn), UsedUp (hết lượt), Disabled (đã ngừng).
 public record VoucherDto(Guid Id, string Code, long DiscountVnd, long MinSubtotalVnd, int MaxUses, int UsedCount, DateTime StartsAtUtc, DateTime EndsAtUtc, bool IsActive,

@@ -115,6 +115,13 @@ $order = (Checkout $buyer $percent.code 1).Content | ConvertFrom-Json
 Check ($order.discountVnd -eq 22500 -and $order.totalVnd -eq 127500) '15% of 150.000 must be 22.500'
 $null = Api POST "/api/v1/orders/$($order.id)/cancel" $null $buyer.token
 
+# PUT không gửi discountPercent (vd chỉ gia hạn) giữ nguyên voucher %; gửi 0 thì chuyển sang giảm cố định
+$extended = Api PUT "/api/v1/vouchers/$($capped.id)" (VoucherBody $capped.code @{ endsAtUtc=(Iso $now.AddDays(30)) }) $admin
+Check ($extended.discountPercent -eq 10 -and $extended.discountVnd -eq 20000) 'PUT without discountPercent must keep the percent voucher'
+$toFixed = Api PUT "/api/v1/vouchers/$($percent.id)" (VoucherBody $percent.code @{ discountPercent=0; discountVnd=30000 }) $admin
+Check ($null -eq $toFixed.discountPercent -and $toFixed.discountVnd -eq 30000) 'PUT discountPercent=0 must switch to a fixed discount'
+Check ($null -eq (NewVoucher "PCT0-$suffix" @{ discountPercent=0 }).discountPercent) 'POST discountPercent=0 must create a fixed voucher'
+
 $once = NewVoucher "ONCE-$suffix" @{ maxUses=1 }
 $order = (Checkout $buyer $once.code 1).Content | ConvertFrom-Json
 Check ((Api GET "/api/v1/vouchers/$($once.id)" $null $admin).status -eq 'UsedUp') 'Voucher with no uses left must be UsedUp'
@@ -216,6 +223,7 @@ Check ((Status (Call GET "/api/v1/products/$($product.id)/reviews")) -eq 404) 'P
 Check ((Status (Call GET "/api/v1/reviews/$($review.id)")) -eq 404) 'Public must not read a review of a hidden product'
 Check ((Api GET "/api/v1/products/$($product.id)/reviews" $null $admin).totalCount -eq 2) 'Admin must still list reviews of a hidden product'
 Check ((Status (Call POST '/api/v1/reviews' @{ productId=$product.id; rating=5; comment='Muộn' } $stranger.token)) -eq 400) 'Review of a hidden product must be 400'
+Check ((Status (Call PUT "/api/v1/reviews/$($review.id)" @{ rating=1; comment='Sửa sau khi ngừng bán' } $buyer.token)) -eq 409) 'Owner must not edit a review of a hidden product'
 $bReview = (Api GET "/api/v1/products/$($product.id)/reviews?rating=3" $null $admin).items[0]
 Check ((Status (Call DELETE "/api/v1/reviews/$($bReview.id)" $null $admin)) -eq 204) 'Admin must delete any review'
 Check ((Status (Call DELETE "/api/v1/reviews/$($review.id)" $null $buyer.token)) -eq 204) 'Owner must delete own review'
@@ -224,6 +232,7 @@ Check ((Status (Call DELETE "/api/v1/reviews/$($review.id)" $null $buyer.token))
 $swagger = Invoke-RestMethod "$Base/swagger/v1/swagger.json"
 $example = $swagger.components.schemas.VoucherRequest.example
 Check ($example.code -eq 'SALE10' -and $example.PSObject.Properties.Name -contains 'discountPercent') 'Swagger voucher example missing'
+Check ($null -eq $example.discountPercent -and $null -eq $example.isActive) 'Swagger example must not change discountPercent/isActive when used for PUT'
 
 $null = Api DELETE "/api/v1/categories/$($category.id)" $null $admin
 Write-Output 'PASS: nghiath voucher CRUD, % discount, checkout rules, status filter, reviews, rating summary, permissions'

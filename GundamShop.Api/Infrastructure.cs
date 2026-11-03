@@ -61,22 +61,24 @@ public class ValidationFilter : IEndpointFilter
 }
 
 // Body mẫu hợp lệ cho POST/PUT voucher trong Swagger (mặc định Swagger cho ngày bắt đầu = ngày kết thúc nên bị báo 400).
+// discountPercent và isActive để null: POST tạo voucher giảm cố định đang bật, PUT giữ nguyên hai trường này.
 public class VoucherRequestExampleFilter : ISchemaFilter
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
         if (context.Type != typeof(VoucherRequest)) return;
         var today = DateTime.UtcNow.Date;
+        string Iso(DateTime value) => value.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
         schema.Example = new OpenApiObject
         {
             ["code"] = new OpenApiString("SALE10"),
             ["discountVnd"] = new OpenApiLong(50000),
             ["minSubtotalVnd"] = new OpenApiLong(300000),
             ["maxUses"] = new OpenApiInteger(100),
-            ["startsAtUtc"] = new OpenApiString(today.ToString("yyyy-MM-ddTHH:mm:ssZ")),
-            ["endsAtUtc"] = new OpenApiString(today.AddDays(30).ToString("yyyy-MM-ddTHH:mm:ssZ")),
+            ["startsAtUtc"] = new OpenApiString(Iso(today)),
+            ["endsAtUtc"] = new OpenApiString(Iso(today.AddDays(30))),
             ["discountPercent"] = new OpenApiNull(),
-            ["isActive"] = new OpenApiBoolean(true)
+            ["isActive"] = new OpenApiNull()
         };
     }
 }

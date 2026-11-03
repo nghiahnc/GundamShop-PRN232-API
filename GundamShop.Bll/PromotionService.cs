@@ -62,7 +62,7 @@ public class PromotionService(ShopDbContext db)
         ShopGuard.Require(ends > DateTime.UtcNow, "Thời điểm kết thúc phải ở tương lai.");
         var code = i.Code.Trim().ToUpperInvariant();
         ShopGuard.Require(!await db.Vouchers.AnyAsync(x => x.Code == code), DuplicateCodeMessage, 409);
-        var x = new Voucher { IsActive = i.IsActive ?? true };
+        var x = new Voucher { IsActive = i.IsActive ?? true, DiscountPercent = Percent(i.DiscountPercent) };
         Copy(i, x, code, starts, ends);
         db.Vouchers.Add(x);
         await SaveVoucher();
@@ -77,8 +77,10 @@ public class PromotionService(ShopDbContext db)
         ShopGuard.Require(!await db.Vouchers.AnyAsync(v => v.Id != id && v.Code == code), DuplicateCodeMessage, 409);
         ShopGuard.Require(i.MaxUses >= x.UsedCount, $"Voucher đã được dùng {x.UsedCount} lượt, MaxUses không thể nhỏ hơn số này.", 409);
         Copy(i, x, code, starts, ends);
-        // Không gửi isActive thì giữ nguyên trạng thái; gửi true để bật lại voucher đã ngừng.
+        // Không gửi thì giữ nguyên: isActive (true để bật lại voucher đã ngừng), discountPercent (0 để chuyển sang giảm cố định).
+        // Nhờ vậy client chỉ gia hạn ngày hay sửa số lượt không vô tình đổi voucher % thành giảm cố định.
         if (i.IsActive is bool active) x.IsActive = active;
+        if (i.DiscountPercent is int percent) x.DiscountPercent = Percent(percent);
         await SaveVoucher();
         return await Voucher(id);
     }
@@ -128,6 +130,8 @@ public class PromotionService(ShopDbContext db)
     public async Task<ReviewDto> UpdateReview(Guid userId, Guid id, ReviewUpdateRequest i)
     {
         var x = ShopGuard.Found(await db.Reviews.SingleOrDefaultAsync(x => x.Id == id && x.UserId == userId), "đánh giá");
+        // Đánh giá của sản phẩm đã ngừng bán bị ẩn, nên không sửa được (vẫn xóa được).
+        ShopGuard.Require(await ProductVisible(x.ProductId, false), "Sản phẩm đã ngừng bán, không sửa được đánh giá.", 409);
         x.Rating = i.Rating; x.Comment = i.Comment.Trim(); await db.SaveChangesAsync();
         return await Review(id, true);
     }
@@ -196,8 +200,11 @@ public class PromotionService(ShopDbContext db)
 
     private static void Copy(VoucherRequest i, Voucher x, string code, DateTime starts, DateTime ends)
     {
-        x.Code = code; x.DiscountVnd = i.DiscountVnd; x.DiscountPercent = i.DiscountPercent;
+        x.Code = code; x.DiscountVnd = i.DiscountVnd;
         x.MinSubtotalVnd = i.MinSubtotalVnd; x.MaxUses = i.MaxUses;
         x.StartsAtUtc = starts; x.EndsAtUtc = ends;
     }
+
+    // 0 hoặc để trống: giảm cố định (lưu null).
+    private static int? Percent(int? value) => value is > 0 ? value : null;
 }
